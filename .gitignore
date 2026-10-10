@@ -4,3 +4,5 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
+# Phase 1: untracked per-run experiment outputs (runner writes here, never Assets/)
+results/
