@@ -2,7 +2,15 @@
 
 ![Project AXION icon](Assets/icon.png)
 
-Project AXION is a research repository for software-only thermal optimization in AI data centers. It contains simulation scripts for Thermally-Aware Tensor Scheduling (TATS), Evolutionary Constraint Mapping (ECM), and the AXION controller with predictive burst detection and SLO-aware power capping.
+> **Evidence status (Phases 0–5 audited).** AXION's thermal model is a mathematically
+> verified **toy model** — it is **not physically calibrated** and no real-world energy,
+> water, or hardware-safety claim is supported. Historical simulation figures below are
+> preserved execution records, not superiority evidence. Fair paired-trial comparisons
+> found that **greedy workload placement captures essentially all observed peak-temperature
+> benefit** over reactive throttling, while the SA-based optimizer adds no demonstrated
+> incremental benefit in tested conditions. Details: `audit_phase0/` … `audit_phase5/`.
+
+Project AXION is a research repository for software-only thermal optimization in AI data centers. It contains the original simulation scripts for Thermally-Aware Tensor Scheduling (TATS), Evolutionary Constraint Mapping (ECM), and the AXION controller with predictive burst detection and SLO-aware power capping — plus a reproducibility harness, a verified physics core, a fair controller-comparison pipeline, a real-inference workload bridge, and an interactive 3D demonstrator.
 
 The goal is simple: reduce AI data-center hotspots before they become emergency cooling events, while preserving workload correctness and service-level objectives (SLOs). Instead of relying only on reactive hardware throttling or facility cooling, AXION treats thermal management as a predictive scheduling and control problem.
 
@@ -41,7 +49,10 @@ The model includes:
 - **Emergency cooling dynamics**: Nodes above the safety threshold trigger last-resort evaporative cooling, modeled as water and energy cost.
 - **Shared workload profile**: Six AI workload classes with different power and latency characteristics.
 
-The shared constants and physics live in [Scripts/core.py](Scripts/core.py).
+The shared constants and physics live in [Scripts/core.py](Scripts/core.py). The verified,
+testable re-expression lives in `src/axion/physics/` (RK4 order ~4 demonstrated against
+analytic and DOP853 references; see `audit_phase2/THERMAL_VERIFICATION_REPORT.md`).
+All thermal constants are **toy/heuristic, uncalibrated** (see `audit_phase2/PARAMETER_PROVENANCE.md`).
 
 ### Thermally-Aware Tensor Scheduling (TATS)
 
@@ -96,6 +107,9 @@ It triggers a fast-path mini Simulated Annealing pass when the slope exceeds bot
 
 This catches true thermal transients while avoiding repeated false positives during normal cycling.
 
+> **Audit note:** the canonical run recorded **zero PBD triggers** (floor 3.70 °C/s exceeds the
+> canonical burst slope ≈ 3.33 °C/s). PBD calibration is deferred pending a precision/recall rig.
+
 ### Simulated Annealing Optimizer
 
 Simulated Annealing evaluates candidate placements, caps, and HVAC levels with an objective that balances:
@@ -137,7 +151,7 @@ The repository models a 32-node AI cluster across 4 racks. Each rack has 8 nodes
 
 The simulations compare proactive scheduling against reactive baselines that rely on throttling and emergency cooling after hotspots occur.
 
-## Results
+## Historical Results (preserved simulation records — see evidence note above)
 
 ### TATS Results
 
@@ -148,8 +162,8 @@ The TATS simulation showed:
 - Mean peak temperature reduction of about `8.06°C`.
 - Emergency cooling events reduced from `465` to `0`.
 - Total modeled water use reduced to `0`.
-- TATS maintained `100%` SLO compliance in the simulation.
-- Welch t-test result was statistically significant with a large effect size.
+- TATS maintained `100%` SLO compliance in the simulation (guard-scoped; the raw baseline scores `0.0%` under the same all-workload scope — see `audit_phase2/LEGACY_METRIC_RECONCILIATION.md`).
+- Welch t-test result was statistically significant with a large effect size (per-step inference since withdrawn; trial-level restatement pending).
 
 ### AXION Controller Results
 
@@ -159,9 +173,9 @@ The AXION controller simulation showed:
 
 - Mean peak temperature reduced from `61.64°C` baseline to `57.99°C`.
 - Cooling events reduced from `328` baseline events to `4`.
-- Total water use reduced by about `98.8%`.
-- Cooling energy reduced by about `98.8%`.
-- AXION maintained `100%` SLO compliance.
+- Total water use reduced by about `98.8%` (modeled proxy, not metered savings).
+- Cooling energy reduced by about `98.8%` (device-energy ledger, no COP).
+- AXION maintained `100%` SLO compliance (SLO-sensitive scope; Gradient exempt).
 - Mean throughput retention remained about `96.4%`.
 
 ### ECM Transfer Results
@@ -170,10 +184,19 @@ The AXION controller simulation showed:
 
 The ECM simulation showed:
 
-- Hyperscale B profile RMSE reduced from `5.50°C` naive transfer to about `0.163°C` with `K=20`.
-- Edge cluster cooling events reduced from `300` to `0` at `K=20`.
-- Hospital AI throughput improved by about `38%` versus naive transfer.
+- Hyperscale B profile RMSE reduced from `5.50°C` naive transfer to about `0.163°C` with `K=20` (static-model fit metric).
+- Edge cluster cooling events reduced from `300` to `0` at `K=20` (static-lookup evaluation).
+- Hospital AI throughput improved by about `38%` versus naive transfer (mean-power proxy).
 - Research HPC converged to near-oracle behavior with sparse observations.
+
+## What the Follow-Up Science Found (Phases 0–5)
+
+- **Phase 0 audit** (`audit_phase0/`): read-only audit; found work-substitution fallbacks, asymmetric SLO enforcement, PBD miscalibration risk, single-run statistics, and uncalibrated constants.
+- **Phase 1 reproducibility** (`audit_phase1/`): manifest schema, safe snapshot-copy runner, independent workload/SLO/action validators; all three legacy scripts reproduce as execution records with historical figures untouched.
+- **Phase 2 verification** (`audit_phase2/`): RK4 4th-order convergence demonstrated; energy ledger closes to quadrature theory (partial — no COP/chiller); sub-ambient HVAC exploit proven and guarded; canonical metrics defined; Gradient-SLO conflict documented (exempt in caps, bound in TATS scoring).
+- **Phase 3 fair comparison** (`audit_phase3/`): 240 paired arms — greedy placement captures essentially all peak benefit over reactive; SA capping adds nothing measurable (all p ≥ 0.23) at ~500× decision cost; predictive term ≡ myopic ablation. Real LFM2.5-230M inference on CPU (8/8 ok) with explicit synthetic thermal bridge; interactive 3D demonstrator with honest source labels.
+- **Phase 4 sensitivity** (`audit_phase4/`): OAT over 10 conditions — greedy sign-robust, SA-null decisive (all diffs within ±0.02 °C vs 0.5 °C margin), sub-ambient exploitation grows with thermal stress.
+- **Phase 5 calibration** (`audit_phase5/`): **BLOCKED** — no temperature/power source on accessible interfaces (WMI denied, no RAPL, no instruments). Frozen RC contract + measurement pipeline + protocol ready; fitter proven on fixtures with identifiability gates.
 
 ## Research Summary
 
@@ -186,9 +209,11 @@ Project AXION demonstrates that data-center thermal management can be treated as
 - Predictive Burst Detection for sudden thermal transients.
 - ECM transfer learning for fast deployment in new facilities.
 
-The broader implication is that software schedulers can reduce physical cooling demand and water use by avoiding thermal saturation before it occurs.
+The broader implication — still to be validated on metered hardware — is that software schedulers can reduce physical cooling demand and water use by avoiding thermal saturation before it occurs.
 
 ## Repository Map
+
+Legacy baseline (frozen at `a8aec0c`; do not modify):
 
 - [Home.md](Home.md): Project landing page and main index.
 - [Notes/Project_AXION_Research_Paper.md](Notes/Project_AXION_Research_Paper.md): Draft research paper.
@@ -199,18 +224,42 @@ The broader implication is that software schedulers can reduce physical cooling 
 - [Scripts/axion.py](Scripts/axion.py): AXION controller simulation and result plot generation.
 - [Assets/icon.png](Assets/icon.png): Primary project icon.
 
+Revival infrastructure (`src/axion/`):
+
+- `config/`, `experiments/` (manifest, RNG streams, safe storage, legacy runner), `constraints/` (workload/SLO/action validators), `metrics/` (canonical metrics), `legacy/` (snapshot helpers).
+- `physics/` (verified equations, analytical references, energy ledger, HVAC guards, verification battery).
+- `sim/` (shared thermal env, scenario library, fair-comparison harness, sensitivity battery), `controllers/` (reactive/greedy/axion/myopic policies).
+- `workloads/` (real LFM2.5-230M inference + explicit thermal bridge), `measurement/` (schema, pipeline, frozen calibration contract, fitter).
+- `service/` (local HTTP API + 3D frontend backend), `deployment/` (modes, policy gate, shadow replay).
+- `frontend/` (Three.js 3D demonstrator, offline-capable).
+
+Audits and evidence: `audit_phase0/` … `audit_phase5/` (phase reports; immutable), `results/` (untracked run records; never committed).
+
 ## Run
 
-Install the Python dependencies, then run scripts from the repository root:
+### Interactive 3D demonstrator (recommended)
 
 ```bash
-pip install -r requirements.txt
-python Scripts/axion.py
-python Scripts/tats_simulation.py
-python Scripts/ecm_simulation.py
+pip install -r requirements.txt   # + torch/transformers for real inference (optional)
+$env:PYTHONPATH = "src"
+python -m axion.service.server --port 8765
+# open http://127.0.0.1:8765/
 ```
 
-Generated result plots are written to `Assets/`.
+### Legacy scripts (safe runner only — never in place; in-place runs overwrite tracked figures)
+
+```bash
+$env:PYTHONPATH = "src"
+python -m axion.experiments.runner tats --seed 0
+python -m axion.experiments.runner axion --seed 0
+python -m axion.experiments.runner ecm --seed 0
+```
+
+### Tests
+
+```bash
+python -m pytest tests/ -q   # 146 tests; live-model test gated by AXION_LIVE_INFERENCE=1
+```
 
 ## Dependencies
 
@@ -227,6 +276,10 @@ Install them with:
 pip install -r requirements.txt
 ```
 
+Optional (real inference + richer UX): `torch`, `transformers`, `scikit-learn`, `psutil`, `flask`/`fastapi` (installed in dev; only stdlib + numpy/scipy required for sim/tests).
+
 ## Conclusion
 
 Project AXION bridges tensor mathematics, thermal physics, and systems scheduling. By combining Tucker Decomposition, Simulated Annealing, SLO-aware power capping, and predictive burst detection, it shows a practical path toward lower water use, lower emergency cooling demand, and more stable AI data-center operation without discarding workloads or violating latency constraints.
+
+That path is now an inspectable, reproducible, challengeable system — with its placement mechanism supported in simulation, its optimizer economics refuted-in-conditions, and physical calibration explicitly blocked pending instrumentation. A skeptical researcher can distinguish what AXION measures, what its equations calculate, what its assumptions imply, what its experiments support, and what must still be proven.
